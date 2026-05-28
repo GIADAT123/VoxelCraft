@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⛏️ VoxelCraft - Minecraft Clone</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="blocker">
+    <div class="menu-panel">
+        <div class="game-title">VoxelCraft</div>
+        <div class="game-subtitle">Sandbox Voxel World</div>
+        <button class="start-btn" id="playBtn">Chơi Ngay</button>
+        <div class="controls-box">
+            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — Di chuyển &nbsp; <kbd>Space</kbd> — Nhảy / Bơi &nbsp; <kbd>Shift</kbd> — Chạy nhanh</div>
+            <div><kbd>Click trái</kbd> — Phá khối / Đánh quái &nbsp; <kbd>Click phải</kbd> — Đặt khối / Ăn</div>
+            <div><kbd>1</kbd>–<kbd>9</kbd> hoặc <kbd>Scroll</kbd> — Chọn vật phẩm &nbsp; <kbd>F3</kbd> — Debug &nbsp; <kbd>E</kbd> — Inventory</div>
+            <div style="color:rgba(255,200,100,0.5);margin-top:4px;">🐄 Giết bò → Nhặt thịt → Click phải để ăn hồi máu</div>
+            <div style="color:rgba(255,100,100,0.5);margin-top:4px;">⚠ Zombie xuất hiện khi trời tối — Hãy chuẩn bị!</div>
+        </div>
+    </div>
+</div>
+
+<div id="crosshair"></div>
+<div id="hotbar"></div>
+<div id="debug"></div>
+<div id="blockTooltip"></div>
+<div id="selectionInfo"></div>
+
+<div id="healthBar">
+    <div class="bar-label">Máu: <span id="healthText">100</span> / 100</div>
+    <div class="bar-bg">
+        <div class="bar-fill" id="healthFill" style="width:100%"></div>
+        <div class="bar-value" id="healthPct">100%</div>
+    </div>
+</div>
+
+<div id="killCounter">
+    <div class="kill-label">Zombie đã hạ</div>
+    <div class="kill-value" id="killValue">0</div>
+    <div class="zombie-count">Sống: <span id="zombieAlive">0</span></div>
+</div>
+
+<div id="damageOverlay"></div>
+<div id="waterOverlay"></div>
+
+<div id="waveAlert">
+    <div class="wave-num" id="waveNum">Đợt 1</div>
+    <div class="wave-text" id="waveText">Zombie đang đến...</div>
+</div>
+
+<div id="deathScreen">
+    <div class="death-title">Bạn đã chết!</div>
+    <div class="death-sub" id="deathCause">Zombie đã tiêu diệt bạn</div>
+    <div class="death-stats">
+        <div class="death-stat"><div class="death-stat-val" id="deathKills">0</div><div class="death-stat-label">Zombie hạ</div></div>
+        <div class="death-stat"><div class="death-stat-val" id="deathWave">1</div><div class="death-stat-label">Đợt sóng</div></div>
+    </div>
+    <button class="start-btn" id="respawnBtn">Hồi sinh</button>
+</div>
+
+<div id="inventoryOverlay">
+    <div id="inventoryPanel">
+        <h2>Inventory</h2>
+        <div id="inventoryHotbar"></div>
+        <div id="inventoryGrid"></div>
+    </div>
+</div>
+
+<div id="pickupToast" style="opacity:0;transform:translateX(-50%) translateY(10px);">
+    <div class="toast-text" id="pickupText"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/noise.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/texture.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/player.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>
