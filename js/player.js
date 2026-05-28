@@ -169,7 +169,7 @@ function collidesSolid(pos,w,h){
 }
 
 function damagePlayer(amount, cause) {
-    if (invulnTimer > 0 || playerDead) return;
+    if ((typeof godMode !== 'undefined' && godMode) || invulnTimer > 0 || playerDead) return;
     playerHealth -= amount;
     invulnTimer = 0.5;
     deathCause = cause || 'Zombie đã tiêu diệt bạn';

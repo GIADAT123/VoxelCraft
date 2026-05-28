@@ -12,11 +12,29 @@
     <div class="menu-panel">
         <div class="game-title">VoxelCraft</div>
         <div class="game-subtitle">Sandbox Voxel World</div>
-        <button class="start-btn" id="playBtn">Chơi Ngay</button>
+
+        <div class="mode-buttons">
+            <button class="start-btn mode-btn" data-mode="survival">
+                <span class="mode-title">Survival Mode</span>
+                <span class="mode-small">Xây dựng ban ngày, sinh tồn ban đêm</span>
+            </button>
+
+            <button class="start-btn mode-btn" data-mode="creative">
+                <span class="mode-title">Creative Mode</span>
+                <span class="mode-small">Block vô hạn, tự do xây dựng</span>
+            </button>
+
+            <button class="start-btn mode-btn" data-mode="showcase">
+                <span class="mode-title">Graphics Showcase</span>
+                <span class="mode-small">Map demo lighting, texture, water, raycast</span>
+            </button>
+        </div>
+
         <div class="controls-box">
             <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — Di chuyển &nbsp; <kbd>Space</kbd> — Nhảy / Bơi &nbsp; <kbd>Shift</kbd> — Chạy nhanh</div>
             <div><kbd>Click trái</kbd> — Phá khối / Đánh quái &nbsp; <kbd>Click phải</kbd> — Đặt khối / Ăn</div>
             <div><kbd>1</kbd>–<kbd>9</kbd> hoặc <kbd>Scroll</kbd> — Chọn vật phẩm &nbsp; <kbd>F3</kbd> — Debug &nbsp; <kbd>E</kbd> — Inventory</div>
+            <div><kbd>T</kbd> — Tua ngày/đêm &nbsp; <kbd>G</kbd> — God mode demo</div>
             <div style="color:rgba(255,200,100,0.5);margin-top:4px;">🐄 Giết bò → Nhặt thịt → Click phải để ăn hồi máu</div>
             <div style="color:rgba(255,100,100,0.5);margin-top:4px;">⚠ Zombie xuất hiện khi trời tối — Hãy chuẩn bị!</div>
         </div>
@@ -28,6 +46,7 @@
 <div id="debug"></div>
 <div id="blockTooltip"></div>
 <div id="selectionInfo"></div>
+<div id="modeBadge" class="mode-badge">survival mode</div>
 
 <div id="healthBar">
     <div class="bar-label">Máu: <span id="healthText">100</span> / 100</div>
