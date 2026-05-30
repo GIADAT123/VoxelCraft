@@ -333,7 +333,26 @@ canvas { display: block; }
     border: 4px solid rgba(0,60,180,0.0);
 }
 
-#waterOverlay.active { opacity: 1; border-color: rgba(0,60,180,0.3); }
+#waterOverlay.active {
+    opacity: 0.78;
+    border-color: rgba(0,80,200,0.25);
+}
+
+#waterOverlay.deep {
+    opacity: 1;
+    background:
+        radial-gradient(ellipse at center, rgba(35,105,160,0.26) 0%, rgba(8,38,88,0.66) 100%),
+        repeating-linear-gradient(
+            0deg,
+            rgba(255,255,255,0.035) 0px,
+            rgba(255,255,255,0.035) 1px,
+            transparent 1px,
+            transparent 10px
+        );
+    backdrop-filter: blur(1.4px) saturate(0.82);
+    -webkit-backdrop-filter: blur(1.4px) saturate(0.82);
+    border-color: rgba(120,180,255,0.36);
+}
 
 /* Death screen */
 #deathScreen {

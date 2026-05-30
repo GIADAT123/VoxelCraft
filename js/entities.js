@@ -151,6 +151,78 @@ function getGroundLevel(x, y, z) {
     return 1;
 }
 
+function isWaterAtOrNearLandAnimal(x, y, z) {
+    const bx = Math.floor(x);
+    const by = Math.floor(y);
+    const bz = Math.floor(z);
+
+    // Check feet/head and the block just below. This prevents cows/pigs/chickens/sheep
+    // from walking down beaches into lakes/ocean.
+    return (
+        getBlock(bx, by, bz) === BLOCK.WATER ||
+        getBlock(bx, by + 1, bz) === BLOCK.WATER ||
+        getBlock(bx, by - 1, bz) === BLOCK.WATER
+    );
+}
+
+function isSafeLandAnimalPosition(x, y, z) {
+    const bx = Math.floor(x);
+    const by = Math.floor(y);
+    const bz = Math.floor(z);
+
+    if (isWaterAtOrNearLandAnimal(x, y, z)) return false;
+
+    // The animal needs solid ground below and free space around body/head.
+    if (!isSolid(getBlock(bx, by - 1, bz))) return false;
+    if (isSolid(getBlock(bx, by, bz))) return false;
+    if (isSolid(getBlock(bx, by + 1, bz))) return false;
+
+    return true;
+}
+
+function faceLandAnimalAlongVelocity(animal, vx, vz) {
+    if (!animal || !animal.mesh) return;
+    if (Math.abs(vx) + Math.abs(vz) < 0.0001) return;
+
+    // Land animal models face local +Z.
+    // This makes head point to movement direction.
+    animal.mesh.rotation.y = Math.atan2(vx, vz);
+}
+
+function turnLandAnimalAwayFromWater(animal) {
+    if (!animal) return;
+
+    animal.wanderDir.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+
+    // Bias away from nearby water.
+    const checks = [
+        [ 1, 0],
+        [-1, 0],
+        [ 0, 1],
+        [ 0,-1],
+        [ 1, 1],
+        [ 1,-1],
+        [-1, 1],
+        [-1,-1],
+    ];
+
+    for (const c of checks) {
+        const nx = animal.mesh.position.x + c[0];
+        const nz = animal.mesh.position.z + c[1];
+        if (isWaterAtOrNearLandAnimal(nx, animal.mesh.position.y, nz)) {
+            animal.wanderDir.x -= c[0] * 0.9;
+            animal.wanderDir.z -= c[1] * 0.9;
+        }
+    }
+
+    if (animal.wanderDir.lengthSq() < 0.001) {
+        animal.wanderDir.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+    }
+
+    animal.wanderDir.normalize();
+    faceLandAnimalAlongVelocity(animal, animal.wanderDir.x, animal.wanderDir.z);
+}
+
 function updateZombies(dt) {
     // Spawn logic - spawn at night
     const sunAngle = dayTime * Math.PI * 2;
@@ -420,108 +492,262 @@ let cows=[];
 const MAX_COWS=8;
 let cowSpawnTimer=0;
 
-function createCowMesh() {
-    const group = new THREE.Group();
-    const cowColor = 0xf5f0e0;
-    const spotColor = 0x4a3520;
-    const noseColor = 0xd4a574;
-    const legColor = 0xe8e0d0;
 
-    // Body
-    const bodyGeo = new THREE.BoxGeometry(0.9, 0.65, 1.3);
-    const bodyMat = new THREE.MeshLambertMaterial({ color: cowColor });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 0.85;
+function randomLandAnimalType(){
+    const types = ['cow', 'pig', 'sheep', 'chicken'];
+    return types[Math.floor(Math.random() * types.length)];
+}
+
+function getLandAnimalHealth(type){
+    if(type === 'chicken') return 5;
+    if(type === 'pig') return 8;
+    if(type === 'sheep') return 9;
+    return 10;
+}
+
+function getLandAnimalSpeed(type){
+    if(type === 'chicken') return 1.15;
+    if(type === 'pig') return 0.85;
+    if(type === 'sheep') return 0.78;
+    return 0.8 + Math.random() * 0.4;
+}
+
+function createAnimalMesh(type) {
+    const group = new THREE.Group();
+    group.userData.animalType = type || 'cow';
+
+    let bodyColor = 0xf5f0e0;
+    let headColor = 0xf5f0e0;
+    let spotColor = 0x4a3520;
+    let noseColor = 0xd4a574;
+    let legColor = 0xe8e0d0;
+    let bodySize = [0.9, 0.65, 1.3];
+    let headSize = [0.5, 0.5, 0.5];
+    let legSize = [0.18, 0.45, 0.18];
+    let headZ = 0.85;
+    let headY = 0.95;
+
+    if (type === 'pig') {
+        bodyColor = 0xff9fb3;
+        headColor = 0xffaabb;
+        spotColor = 0xe88598;
+        noseColor = 0xff7890;
+        legColor = 0xee8ea0;
+        bodySize = [0.85, 0.55, 1.05];
+        headSize = [0.48, 0.42, 0.45];
+        headZ = 0.68;
+        headY = 0.78;
+    } else if (type === 'sheep') {
+        bodyColor = 0xf2f2df;
+        headColor = 0x4a4038;
+        spotColor = 0xffffff;
+        noseColor = 0x3b332c;
+        legColor = 0x3b332c;
+        bodySize = [0.95, 0.72, 1.12];
+        headSize = [0.43, 0.42, 0.42];
+        headZ = 0.75;
+        headY = 0.92;
+    } else if (type === 'chicken') {
+        bodyColor = 0xffffff;
+        headColor = 0xffffff;
+        spotColor = 0xf4d35e;
+        noseColor = 0xffaa22;
+        legColor = 0xffcc55;
+        bodySize = [0.45, 0.5, 0.55];
+        headSize = [0.28, 0.28, 0.28];
+        legSize = [0.07, 0.28, 0.07];
+        headZ = 0.42;
+        headY = 0.88;
+    }
+
+    const body = new THREE.Mesh(
+        new THREE.BoxGeometry(bodySize[0], bodySize[1], bodySize[2]),
+        new THREE.MeshLambertMaterial({ color: bodyColor })
+    );
+    body.position.y = type === 'chicken' ? 0.52 : 0.85;
     group.add(body);
 
-    // Spots on body
     const spotMat = new THREE.MeshLambertMaterial({ color: spotColor });
-    const spot1 = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.66, 0.4), spotMat);
-    spot1.position.set(0.2, 0.85, 0.15);
-    group.add(spot1);
-    const spot2 = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.66, 0.3), spotMat);
-    spot2.position.set(-0.22, 0.85, -0.3);
-    group.add(spot2);
+    if (type === 'cow') {
+        const spot1 = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.66, 0.4), spotMat);
+        spot1.position.set(0.2, 0.85, 0.15);
+        group.add(spot1);
+        const spot2 = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.66, 0.3), spotMat);
+        spot2.position.set(-0.22, 0.85, -0.3);
+        group.add(spot2);
+    } else if (type === 'sheep') {
+        const wool = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.82, 1.22), new THREE.MeshLambertMaterial({color:0xffffff}));
+        wool.position.y = 0.86;
+        wool.scale.set(1, 1, 1);
+        group.add(wool);
+    }
 
-    // Head
-    const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-    const headMat = new THREE.MeshLambertMaterial({ color: cowColor });
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.set(0, 0.95, 0.85);
+    const head = new THREE.Mesh(
+        new THREE.BoxGeometry(headSize[0], headSize[1], headSize[2]),
+        new THREE.MeshLambertMaterial({ color: headColor })
+    );
+    head.position.set(0, headY, headZ);
     head.name = 'head';
     group.add(head);
 
-    // Nose/snout
-    const noseGeo = new THREE.BoxGeometry(0.3, 0.22, 0.12);
-    const noseMat = new THREE.MeshLambertMaterial({ color: noseColor });
-    const nose = new THREE.Mesh(noseGeo, noseMat);
-    nose.position.set(0, 0.85, 1.13);
+    const nose = new THREE.Mesh(
+        new THREE.BoxGeometry(type === 'chicken' ? 0.16 : 0.3, type === 'chicken' ? 0.09 : 0.22, type === 'chicken' ? 0.12 : 0.12),
+        new THREE.MeshLambertMaterial({ color: noseColor })
+    );
+    nose.position.set(0, headY - 0.10, headZ + headSize[2] * 0.55);
     group.add(nose);
 
-    // Eyes
-    const eyeGeo = new THREE.BoxGeometry(0.07, 0.07, 0.05);
+    const eyeGeo = new THREE.BoxGeometry(0.055, 0.055, 0.035);
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
     const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-    leftEye.position.set(-0.15, 1.03, 1.11);
+    leftEye.position.set(-headSize[0]*0.24, headY + headSize[1]*0.12, headZ + headSize[2]*0.52);
     group.add(leftEye);
     const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-    rightEye.position.set(0.15, 1.03, 1.11);
+    rightEye.position.set(headSize[0]*0.24, headY + headSize[1]*0.12, headZ + headSize[2]*0.52);
     group.add(rightEye);
 
-    // Horns
-    const hornGeo = new THREE.BoxGeometry(0.07, 0.16, 0.07);
-    const hornMat = new THREE.MeshLambertMaterial({ color: 0xd4c5a0 });
-    const lHorn = new THREE.Mesh(hornGeo, hornMat);
-    lHorn.position.set(-0.18, 1.28, 0.85); lHorn.rotation.z = 0.3;
-    group.add(lHorn);
-    const rHorn = new THREE.Mesh(hornGeo, hornMat);
-    rHorn.position.set(0.18, 1.28, 0.85); rHorn.rotation.z = -0.3;
-    group.add(rHorn);
+    if (type === 'cow' || type === 'sheep') {
+        const hornGeo = new THREE.BoxGeometry(0.07, 0.16, 0.07);
+        const hornMat = new THREE.MeshLambertMaterial({ color: 0xd4c5a0 });
+        const lHorn = new THREE.Mesh(hornGeo, hornMat);
+        lHorn.position.set(-0.18, headY + 0.33, headZ);
+        lHorn.rotation.z = 0.3;
+        group.add(lHorn);
+        const rHorn = new THREE.Mesh(hornGeo, hornMat);
+        rHorn.position.set(0.18, headY + 0.33, headZ);
+        rHorn.rotation.z = -0.3;
+        group.add(rHorn);
+    }
 
-    // Legs
-    const legGeo = new THREE.BoxGeometry(0.18, 0.45, 0.18);
+    const legGeo = new THREE.BoxGeometry(legSize[0], legSize[1], legSize[2]);
     const legMat = new THREE.MeshLambertMaterial({ color: legColor });
-    const legPos = [[-0.3,0.22,0.45],[0.3,0.22,0.45],[-0.3,0.22,-0.45],[0.3,0.22,-0.45]];
+    const legY = type === 'chicken' ? 0.15 : 0.22;
+    const legSpreadX = type === 'chicken' ? 0.13 : 0.3;
+    const legFrontZ = type === 'chicken' ? 0.18 : 0.45;
+    const legBackZ = type === 'chicken' ? -0.18 : -0.45;
+    const legPos = [[-legSpreadX,legY,legFrontZ],[legSpreadX,legY,legFrontZ],[-legSpreadX,legY,legBackZ],[legSpreadX,legY,legBackZ]];
     const legNames = ['leftFrontLeg','rightFrontLeg','leftBackLeg','rightBackLeg'];
-    legPos.forEach((p,i) => {
+
+    for(let i=0;i<4;i++){
         const leg = new THREE.Mesh(legGeo, legMat);
-        leg.position.set(p[0],p[1],p[2]); leg.name = legNames[i];
+        leg.position.set(...legPos[i]);
+        leg.name = legNames[i];
         group.add(leg);
+    }
+
+    if (type !== 'chicken') {
+        const tail = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08,0.08,0.35),
+            new THREE.MeshLambertMaterial({color:type==='pig'?0xff8fa0:0x3a2a18})
+        );
+        tail.position.set(0,0.95,-bodySize[2]*0.58);
+        tail.rotation.x = 0.5;
+        tail.name = 'tail';
+        group.add(tail);
+    } else {
+        const comb = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.14,0.05), new THREE.MeshLambertMaterial({color:0xff3333}));
+        comb.position.set(0, headY + 0.19, headZ);
+        group.add(comb);
+    }
+
+    group.traverse(obj => {
+        if (obj.isMesh) {
+            obj.castShadow = true;
+            obj.receiveShadow = true;
+        }
     });
 
-    // Tail
-    const tailGeo = new THREE.BoxGeometry(0.06, 0.06, 0.5);
-    const tailMat = new THREE.MeshLambertMaterial({ color: cowColor });
-    const tail = new THREE.Mesh(tailGeo, tailMat);
-    tail.position.set(0, 1.05, -0.85);
-    tail.name = 'tail';
-    group.add(tail);
-
-    group.castShadow = true;
     return group;
 }
 
-function spawnCow() {
-    if (cows.length >= MAX_COWS) return;
-    const mesh = createCowMesh();
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 10 + Math.random() * 15;
-    let sx = playerPos.x + Math.cos(angle) * dist;
-    let sz = playerPos.z + Math.sin(angle) * dist;
-    let sy = getTerrainHeight(Math.floor(sx), Math.floor(sz)) + 1;
-    // Don't spawn in water
-    if (getBlock(Math.floor(sx), Math.floor(sy), Math.floor(sz)) === BLOCK.WATER) return;
-    mesh.position.set(sx, sy, sz);
-    scene.add(mesh);
-    cows.push({
-        mesh, health: 10, maxHealth: 10, hurtTimer: 0,
-        walkPhase: Math.random() * Math.PI * 2,
-        targetY: sy, knockbackVel: new THREE.Vector3(0,0,0),
-        aiState: 'idle', aiTimer: 2 + Math.random() * 3,
-        wanderDir: new THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize(),
-        walkSpeed: 0.8 + Math.random() * 0.4,
-    });
+function createCowMesh(type){
+    return createAnimalMesh(type || 'cow');
 }
+
+
+
+function spawnCow(type, options) {
+    if (cows.length >= MAX_COWS) return null;
+
+    options = options || {};
+    const animalType = type || randomLandAnimalType();
+
+    let sx, sy, sz;
+
+    if (options.x !== undefined && options.y !== undefined && options.z !== undefined) {
+        sx = options.x;
+        sy = options.y;
+        sz = options.z;
+    } else {
+        let found = false;
+
+        for (let attempt = 0; attempt < 14; attempt++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 10 + Math.random() * 15;
+            sx = playerPos.x + Math.cos(angle) * dist;
+            sz = playerPos.z + Math.sin(angle) * dist;
+            sy = getTerrainHeight(Math.floor(sx), Math.floor(sz)) + 1;
+
+            if (!isSafeLandAnimalPosition(sx, sy, sz)) {
+                continue;
+            }
+
+            found = true;
+            break;
+        }
+
+        if (!found) return null;
+    }
+
+    if (!options.force && !isSafeLandAnimalPosition(sx, sy, sz)) {
+        return null;
+    }
+
+    const mesh = createAnimalMesh(animalType);
+    mesh.position.set(sx, sy, sz);
+
+    if (options.yaw !== undefined) {
+        mesh.rotation.y = options.yaw;
+    }
+
+    scene.add(mesh);
+
+    const initialDir = new THREE.Vector3(
+        Math.sin(mesh.rotation.y),
+        0,
+        Math.cos(mesh.rotation.y)
+    );
+
+    if (initialDir.lengthSq() < 0.001) {
+        initialDir.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+    }
+    initialDir.normalize();
+
+    const hp = getLandAnimalHealth(animalType);
+
+    const animal = {
+        mesh,
+        type: animalType,
+        showcaseAnimal: !!options.showcaseAnimal,
+        health: options.health || hp,
+        maxHealth: options.health || hp,
+        hurtTimer: 0,
+        walkPhase: Math.random() * Math.PI * 2,
+        targetY: sy,
+        prevY: sy,
+        knockbackVel: new THREE.Vector3(0,0,0),
+        aiState: options.aiState || 'idle',
+        aiTimer: options.aiTimer !== undefined ? options.aiTimer : 2 + Math.random() * 3,
+        wanderDir: options.wanderDir ? options.wanderDir.clone().normalize() : initialDir,
+        walkSpeed: options.walkSpeed || getLandAnimalSpeed(animalType),
+    };
+
+    cows.push(animal);
+    faceLandAnimalAlongVelocity(animal, animal.wanderDir.x, animal.wanderDir.z);
+
+    return animal;
+}
+
 
 function updateCows(dt) {
     const sunAngle = dayTime * Math.PI * 2;
@@ -559,7 +785,7 @@ function updateCows(dt) {
                         cow.aiState = 'wander';
                         cow.aiTimer = 2 + Math.random() * 4;
                         cow.wanderDir.set(Math.random()-0.5, 0, Math.random()-0.5).normalize();
-                        cow.mesh.rotation.y = Math.atan2(cow.wanderDir.x, cow.wanderDir.z);
+                        faceLandAnimalAlongVelocity(cow, cow.wanderDir.x, cow.wanderDir.z);
                     }
                     break;
                 case 'wander':
@@ -570,15 +796,18 @@ function updateCows(dt) {
                         let nx = cow.mesh.position.x + cow.wanderDir.x * ms;
                         let nz = cow.mesh.position.z + cow.wanderDir.z * ms;
                         const zy = cow.mesh.position.y;
-                        if (!isSolid(getBlock(Math.floor(nx),Math.floor(zy),Math.floor(cow.mesh.position.z))) &&
-                            !isSolid(getBlock(Math.floor(nx),Math.floor(zy+1),Math.floor(cow.mesh.position.z)))) {
+                        if (isSafeLandAnimalPosition(nx, zy, cow.mesh.position.z)) {
                             cow.mesh.position.x = nx;
-                        } else { cow.wanderDir.x *= -1; cow.wanderDir.z = Math.random()-0.5; cow.wanderDir.normalize(); }
-                        if (!isSolid(getBlock(Math.floor(cow.mesh.position.x),Math.floor(zy),Math.floor(nz))) &&
-                            !isSolid(getBlock(Math.floor(cow.mesh.position.x),Math.floor(zy+1),Math.floor(nz)))) {
+                        } else {
+                            turnLandAnimalAwayFromWater(cow);
+                        }
+
+                        if (isSafeLandAnimalPosition(cow.mesh.position.x, zy, nz)) {
                             cow.mesh.position.z = nz;
-                        } else { cow.wanderDir.z *= -1; cow.wanderDir.x = Math.random()-0.5; cow.wanderDir.normalize(); }
-                        cow.mesh.rotation.y = Math.atan2(cow.wanderDir.x, cow.wanderDir.z);
+                        } else {
+                            turnLandAnimalAwayFromWater(cow);
+                        }
+                        faceLandAnimalAlongVelocity(cow, cow.wanderDir.x, cow.wanderDir.z);
                     }
                     break;
                 case 'flee':
@@ -590,13 +819,16 @@ function updateCows(dt) {
                         let nx = cow.mesh.position.x + fd.x * ms;
                         let nz = cow.mesh.position.z + fd.z * ms;
                         const zy = cow.mesh.position.y;
-                        if (!isSolid(getBlock(Math.floor(nx),Math.floor(zy),Math.floor(cow.mesh.position.z))) &&
-                            !isSolid(getBlock(Math.floor(nx),Math.floor(zy+1),Math.floor(cow.mesh.position.z)))) {
+                        if (isSafeLandAnimalPosition(nx, zy, cow.mesh.position.z)) {
                             cow.mesh.position.x = nx;
+                        } else {
+                            turnLandAnimalAwayFromWater(cow);
                         }
-                        if (!isSolid(getBlock(Math.floor(cow.mesh.position.x),Math.floor(zy),Math.floor(nz))) &&
-                            !isSolid(getBlock(Math.floor(cow.mesh.position.x),Math.floor(zy+1),Math.floor(nz)))) {
+
+                        if (isSafeLandAnimalPosition(cow.mesh.position.x, zy, nz)) {
                             cow.mesh.position.z = nz;
+                        } else {
+                            turnLandAnimalAwayFromWater(cow);
                         }
                         cow.mesh.rotation.y = Math.atan2(fd.x, fd.z);
                     }
@@ -645,6 +877,33 @@ function updateCows(dt) {
             cow.targetY = cow.mesh.position.y;
         }
 
+        // Absolute safety: land animal must not stay inside water.
+        if (isWaterAtOrNearLandAnimal(cow.mesh.position.x, cow.mesh.position.y, cow.mesh.position.z)) {
+            let rescued = false;
+
+            for (let r = 1; r <= 6 && !rescued; r++) {
+                for (let a = 0; a < 12 && !rescued; a++) {
+                    const ang = (Math.PI * 2 * a) / 12;
+                    const tx = cow.mesh.position.x + Math.cos(ang) * r;
+                    const tz = cow.mesh.position.z + Math.sin(ang) * r;
+                    const ty = getGroundLevel(tx, cow.mesh.position.y + 3, tz);
+
+                    if (isSafeLandAnimalPosition(tx, ty, tz)) {
+                        cow.mesh.position.set(tx, ty, tz);
+                        cow.targetY = ty;
+                        turnLandAnimalAwayFromWater(cow);
+                        rescued = true;
+                    }
+                }
+            }
+
+            if (!rescued) {
+                scene.remove(cow.mesh);
+                cows.splice(i, 1);
+                continue;
+            }
+        }
+
         // Hurt flash
         if (cow.hurtTimer > 0) {
             cow.hurtTimer -= dt;
@@ -667,7 +926,7 @@ function updateCows(dt) {
         if (cow.health <= 0) {
             const dc = 1 + Math.floor(Math.random() * 3);
             for (let d = 0; d < dc; d++) {
-                spawnDropItem(ITEM.BEEF, cow.mesh.position.x + (Math.random()-0.5)*0.5, cow.mesh.position.y+0.5, cow.mesh.position.z + (Math.random()-0.5)*0.5);
+                spawnAnimalMeatDrop(cow.type || 'cow', cow.mesh.position.x + (Math.random()-0.5)*0.5, cow.mesh.position.y+0.5, cow.mesh.position.z + (Math.random()-0.5)*0.5);
             }
             createExplosionParticles(cow.mesh.position.clone().add(new THREE.Vector3(0,0.5,0)), 0xf5f0e0, 8);
             playSound(300,'sawtooth',0.2,0.08);
@@ -701,6 +960,14 @@ function spawnDropItem(blockType,x,y,z){
         life:60,spinPhase:Math.random()*Math.PI*2,
         color:new THREE.Color(cl[0],cl[1],cl[2])
     });
+}
+
+function spawnAnimalMeatDrop(animalType,x,y,z){
+    const meatItem = typeof getMeatItemForAnimal === 'function'
+        ? getMeatItemForAnimal(animalType)
+        : ITEM.BEEF;
+
+    spawnDropItem(meatItem,x,y,z);
 }
 
 function updateDropItems(dt){
@@ -775,3 +1042,7 @@ function updateParticles(dt) {
         }
     }
 }
+
+
+// Allow other animal systems to reuse the matching meat drop helper.
+window.spawnAnimalMeatDrop = spawnAnimalMeatDrop;

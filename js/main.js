@@ -31,6 +31,93 @@ let showcaseTorches = [];
 let showcaseDecorGroup = null;
 
 // ================================================================
+// DAY/NIGHT CONSTANTS
+// ================================================================
+const DAY_NIGHT_SPEED = 0.00125;       // 1 vòng ngày/đêm khoảng 13 phút
+const DAY_NIGHT_FAST_MULTIPLIER = 80;  // giữ T để tua nhanh nhưng không quá gắt
+
+// ================================================================
+// TORCH CONSTANTS
+// ================================================================
+const TORCH_LIGHT_INTENSITY = 2.45;
+const TORCH_LIGHT_DISTANCE = 30;
+const TORCH_LIGHT_DECAY = 1.25;
+
+const TORCH_FILL_INTENSITY = 0.85;
+const TORCH_FILL_DISTANCE = 22;
+const TORCH_FILL_DECAY = 1.05;
+
+const TORCH_NIGHT_DISTANCE_BOOST = 16;
+const TORCH_NIGHT_FILL_DISTANCE_BOOST = 18;
+const TORCH_NIGHT_FILL_INTENSITY_BOOST = 0.85;
+
+const TORCH_FLICKER_AMOUNT = 0.06;
+
+// ================================================================
+// INPUT / IME SHIELD
+// ================================================================
+let gameInputShieldEnabled = false;
+
+function isEditableElement(el){
+    if(!el) return false;
+
+    const tag = (el.tagName || '').toLowerCase();
+
+    return (
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        el.isContentEditable
+    );
+}
+
+function blurEditableElements(){
+    const active = document.activeElement;
+
+    if(isEditableElement(active)){
+        active.blur();
+    }
+}
+
+function preventGameTextInput(e){
+    if(!gameInputShieldEnabled) return;
+    if(isEditableElement(e.target)) return;
+
+    if(gameStarted && !gamePaused){
+        e.preventDefault();
+        e.stopPropagation();
+    }
+}
+
+function enableGameInputShield(){
+    if(gameInputShieldEnabled) return;
+
+    gameInputShieldEnabled = true;
+
+    document.documentElement.setAttribute('lang','en');
+    document.body.setAttribute('spellcheck','false');
+    document.body.style.imeMode = 'disabled';
+
+    blurEditableElements();
+
+    document.addEventListener('compositionstart', preventGameTextInput, true);
+    document.addEventListener('compositionupdate', preventGameTextInput, true);
+    document.addEventListener('compositionend', preventGameTextInput, true);
+    document.addEventListener('beforeinput', preventGameTextInput, true);
+    document.addEventListener('input', preventGameTextInput, true);
+}
+
+function disableGameInputShield(){
+    gameInputShieldEnabled = false;
+
+    document.removeEventListener('compositionstart', preventGameTextInput, true);
+    document.removeEventListener('compositionupdate', preventGameTextInput, true);
+    document.removeEventListener('compositionend', preventGameTextInput, true);
+    document.removeEventListener('beforeinput', preventGameTextInput, true);
+    document.removeEventListener('input', preventGameTextInput, true);
+}
+
+// ================================================================
 // AUDIO
 // ================================================================
 let audioCtx;
@@ -92,7 +179,7 @@ function createPlayerShadow(){
     const mat = new THREE.MeshBasicMaterial({
         color: 0x000000,
         transparent: true,
-        opacity: 0.22,
+        opacity: 0.20,
         depthWrite: false
     });
 
@@ -147,8 +234,8 @@ function updatePlayerShadow(){
     const sunHorizontal = new THREE.Vector2(sunX, sunZ).normalize();
     const shadowDir = sunHorizontal.clone().multiplyScalar(-1);
 
-    const length = Math.max(0.55, Math.min(4.2, 1.15 / (sunY + 0.16)));
-    const width = 0.38 + Math.max(0, 0.25 - sunY * 0.12);
+    const length = Math.max(0.45, Math.min(3.8, 1.05 / (sunY + 0.16)));
+    const width = 0.36 + Math.max(0, 0.25 - sunY * 0.12);
 
     const offsetX = shadowDir.x * length * 0.32;
     const offsetZ = shadowDir.y * length * 0.32;
@@ -164,7 +251,7 @@ function updatePlayerShadow(){
 
     playerShadowMesh.scale.set(length, width, 1);
 
-    playerShadowMesh.material.opacity = Math.max(0.06, Math.min(0.24, sunY * 0.22));
+    playerShadowMesh.material.opacity = Math.max(0.05, Math.min(0.20, sunY * 0.20));
     playerShadowMesh.visible = true;
 }
 
@@ -176,14 +263,20 @@ function applyShadowFlagsToScene(){
 
         const mat = obj.material;
         const isWater = typeof waterMaterial !== 'undefined' && mat === waterMaterial;
+        const isGlass =
+            (typeof glassMaterial !== 'undefined' && mat === glassMaterial) ||
+            (obj.userData && obj.userData.isGlassMesh);
         const isTransparent = typeof transparentMaterial !== 'undefined' && mat === transparentMaterial;
 
         if(isWater){
             obj.castShadow = false;
             obj.receiveShadow = false;
+        }else if(isGlass){
+            obj.castShadow = false;
+            obj.receiveShadow = false;
         }else if(isTransparent){
             obj.castShadow = false;
-            obj.receiveShadow = true;
+            obj.receiveShadow = false;
         }else{
             obj.castShadow = true;
             obj.receiveShadow = true;
@@ -210,30 +303,63 @@ function updateShadowSystem(dt){
 // DAY/NIGHT
 // ================================================================
 function updateDayNight(dt){
-    dayTime+=dt*0.005;
-    if(dayTime>1)dayTime-=1;
+    dayTime += dt * DAY_NIGHT_SPEED;
+    if(dayTime > 1) dayTime -= 1;
 
-    const sunAngle=dayTime*Math.PI*2;
-    const sunY=Math.sin(sunAngle);
-    const sunX=Math.cos(sunAngle);
+    const sunAngle = dayTime * Math.PI * 2;
+    const sunY = Math.sin(sunAngle);
+    const sunX = Math.cos(sunAngle);
 
-    sunLight.position.set(sunX*150,sunY*200,80);
+    sunLight.position.set(sunX * 150, sunY * 200, 80);
 
-    const dayB=Math.max(0,sunY);
-    const nightB=Math.max(0,-sunY)*0.3;
+    const dayB = Math.max(0, sunY);
+    const nightB = Math.max(0, -sunY) * 0.3;
 
-    sunLight.intensity=dayB*1.0;
-    ambientLight.intensity=0.4+dayB*0.4+nightB;
+    sunLight.intensity = dayB * 1.12;
+    ambientLight.intensity = 0.42 + dayB * 0.42 + nightB;
 
-    const r=0.08+dayB*0.45;
-    const g=0.08+dayB*0.72;
-    const b=0.12+dayB*0.73;
+    const r = 0.09 + dayB * 0.46;
+    const g = 0.12 + dayB * 0.66;
+    const b = 0.18 + dayB * 0.72;
 
-    const sky=new THREE.Color(r,g,b);
-    scene.background=sky;
-    scene.fog.color=sky;
+    const sky = new THREE.Color(r, g, b);
+    scene.background = sky;
+    scene.fog.color = sky;
 
-    sunLight.color.setHex(dayB<0.3&&dayB>0?0xff8844:0xfff5e0);
+    scene.fog.near = 55;
+    scene.fog.far = RENDER_DIST * CHUNK_SIZE * 1.65;
+
+    if(dayB > 0.7){
+        sunLight.color.setHex(0xfff5e0);
+    }else if(dayB > 0.25){
+        sunLight.color.setHex(0xffcc88);
+    }else{
+        sunLight.color.setHex(0x6688cc);
+    }
+}
+
+function smoothstep(edge0, edge1, x){
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+}
+
+function getNightFactor(){
+    const t = ((dayTime % 1) + 1) % 1;
+
+    const eveningFadeIn = smoothstep(0.46, 0.56, t);
+    const dawnFadeOut = 1.0 - smoothstep(0.96, 1.00, t);
+
+    return Math.max(0, Math.min(1, eveningFadeIn * dawnFadeOut));
+}
+
+function isCameraActuallyUnderwater(){
+    if(!camera) return false;
+
+    const bx = Math.floor(camera.position.x);
+    const by = Math.floor(camera.position.y);
+    const bz = Math.floor(camera.position.z);
+
+    return getBlock(bx, by, bz) === BLOCK.WATER;
 }
 
 // ================================================================
@@ -437,6 +563,7 @@ function resumeGame(){
 
     showGameHUD();
     updateModeBadge();
+    enableGameInputShield();
 
     renderer.domElement.requestPointerLock();
 }
@@ -446,6 +573,7 @@ function resumeGame(){
 // ================================================================
 function startGame(mode){
     initAudio();
+    enableGameInputShield();
 
     applyGameMode(mode||'survival');
     gameStarted=true;
@@ -487,7 +615,8 @@ function applyGameMode(mode){
         ];
 
         playerInventory={};
-        dayTime=0.3;
+        dayTime=0.30;
+        updateDayNight(0);
         playerPos.set(0,getTerrainHeight(0,0)+3,0);
         disposeShowcaseDecor();
     }
@@ -495,13 +624,17 @@ function applyGameMode(mode){
     if(gameMode==='creative'){
         setupCreativeInventory();
         dayTime=0.30;
+        updateDayNight(0);
         playerPos.set(0,getTerrainHeight(0,0)+3,0);
         disposeShowcaseDecor();
     }
 
     if(gameMode==='showcase'){
         setupCreativeInventory();
-        dayTime=0.22;
+
+        dayTime=0.30;
+        updateDayNight(0);
+
         setupShowcaseStage();
         resetShowcasePlayer();
     }
@@ -614,6 +747,13 @@ function disposeShowcaseDecor(){
 
     for(const t of showcaseTorches){
         if(t.light)scene.remove(t.light);
+        if(t.fillLight)scene.remove(t.fillLight);
+
+        if(Array.isArray(t.lights)){
+            for(const l of t.lights){
+                scene.remove(l);
+            }
+        }
     }
 
     showcaseDecorGroup=null;
@@ -696,7 +836,7 @@ function setupShowcaseLabels(){
     addShowcaseLabel('BLOCK GALLERY','Texture atlas + voxel materials',-18,showcaseBaseY+6.8,-7);
     addShowcaseLabel('TRANSPARENCY','Glass, leaves, water materials',21,showcaseBaseY+6.8,-7);
     addShowcaseLabel('PARTICLE DEMO','Press P or break blocks',-18,showcaseBaseY+5.7,6);
-    addShowcaseLabel('ENTITY PEN','Cow mesh + animation + shadows',21,showcaseBaseY+5.7,6);
+    addShowcaseLabel('ENTITY PEN','Land animals + animation + shadows',21,showcaseBaseY+5.7,6);
     addShowcaseLabel('RAYCAST WALL','Block picking, breaking, placing',-18,showcaseBaseY+6.6,31);
     addShowcaseLabel('WATER POOL','Glass pool + natural water surface',21,showcaseBaseY+6.6,31);
     addShowcaseLabel('POINT LIGHT DEMO','Local torch lighting + flicker',0,showcaseBaseY+6.8,-31);
@@ -716,39 +856,63 @@ function createTorch(x,y,z){
     pole.receiveShadow=true;
     torchGroup.add(pole);
 
-    const fireGeo=new THREE.BoxGeometry(0.35,0.35,0.35);
+    const fireGeo=new THREE.BoxGeometry(0.36,0.36,0.36);
+
     const fireMat=new THREE.MeshBasicMaterial({
-        color:0xffaa33,
+        color:0xffc15a,
         transparent:true,
         opacity:0.95
     });
+
     const fire=new THREE.Mesh(fireGeo,fireMat);
     fire.position.y=1.25;
+    fire.castShadow=false;
+    fire.receiveShadow=false;
     torchGroup.add(fire);
 
-    const haloGeo=new THREE.SphereGeometry(0.38,12,12);
+    const haloGeo=new THREE.SphereGeometry(0.9,18,18);
     const haloMat=new THREE.MeshBasicMaterial({
-        color:0xffaa33,
+        color:0xffaa44,
         transparent:true,
-        opacity:0.18,
-        depthWrite:false
+        opacity:0.11,
+        depthWrite:false,
+        blending:THREE.AdditiveBlending
     });
+
     const halo=new THREE.Mesh(haloGeo,haloMat);
     halo.position.y=1.25;
+    halo.castShadow=false;
+    halo.receiveShadow=false;
     torchGroup.add(halo);
 
-    const light=new THREE.PointLight(0xffaa55,1.45,18,2.1);
+    const light=new THREE.PointLight(
+        0xffaa55,
+        TORCH_LIGHT_INTENSITY,
+        TORCH_LIGHT_DISTANCE,
+        TORCH_LIGHT_DECAY
+    );
+
     light.position.set(x,y+1.25,z);
-    light.castShadow=true;
-    light.shadow.mapSize.width=512;
-    light.shadow.mapSize.height=512;
-    light.shadow.bias=-0.002;
+    light.castShadow=false;
     scene.add(light);
 
+    const fillLight=new THREE.PointLight(
+        0xffbb66,
+        TORCH_FILL_INTENSITY,
+        TORCH_FILL_DISTANCE,
+        TORCH_FILL_DECAY
+    );
+
+    fillLight.position.set(x,y+0.65,z);
+    fillLight.castShadow=false;
+    scene.add(fillLight);
+
     torchGroup.userData.light=light;
+    torchGroup.userData.fillLight=fillLight;
     torchGroup.userData.fire=fire;
     torchGroup.userData.halo=halo;
-    torchGroup.userData.baseIntensity=1.45;
+    torchGroup.userData.baseIntensity=TORCH_LIGHT_INTENSITY;
+    torchGroup.userData.baseFillIntensity=TORCH_FILL_INTENSITY;
     torchGroup.userData.phase=Math.random()*Math.PI*2;
 
     group.add(torchGroup);
@@ -756,9 +920,12 @@ function createTorch(x,y,z){
     showcaseTorches.push({
         group:torchGroup,
         light,
+        fillLight,
+        lights:[light,fillLight],
         fire,
         halo,
-        baseIntensity:1.45,
+        baseIntensity:TORCH_LIGHT_INTENSITY,
+        baseFillIntensity:TORCH_FILL_INTENSITY,
         phase:torchGroup.userData.phase
     });
 }
@@ -784,23 +951,48 @@ function setupTorchDemo(){
 function updateTorchLights(dt){
     if(gameMode!=='showcase')return;
 
+    const nightFactor = getNightFactor();
+
     for(const t of showcaseTorches){
-        const flicker = 0.85 + Math.sin(gameTime*8 + t.phase)*0.08 + Math.random()*0.08;
-        const intensity = t.baseIntensity * flicker;
+        const flicker =
+            1.0 +
+            Math.sin(gameTime*8.0 + t.phase) * TORCH_FLICKER_AMOUNT +
+            Math.sin(gameTime*17.0 + t.phase*0.7) * (TORCH_FLICKER_AMOUNT * 0.35);
+
+        const mainIntensity = t.baseIntensity * flicker;
+
+        const fillIntensity =
+            t.baseFillIntensity *
+            (0.96 + Math.sin(gameTime*5.5 + t.phase)*0.025) *
+            (1.0 + nightFactor * TORCH_NIGHT_FILL_INTENSITY_BOOST);
 
         if(t.light){
-            t.light.intensity=intensity;
+            t.light.intensity = mainIntensity;
+            t.light.distance = TORCH_LIGHT_DISTANCE + nightFactor * TORCH_NIGHT_DISTANCE_BOOST;
+        }
+
+        if(t.fillLight){
+            t.fillLight.intensity = fillIntensity;
+            t.fillLight.distance = TORCH_FILL_DISTANCE + nightFactor * TORCH_NIGHT_FILL_DISTANCE_BOOST;
         }
 
         if(t.fire){
-            const s=0.9+Math.random()*0.22;
-            t.fire.scale.set(s,1.0+Math.random()*0.18,s);
+            const s =
+                1.0 +
+                Math.sin(gameTime*12.0 + t.phase) * 0.04 +
+                Math.random() * 0.025;
+
+            t.fire.scale.set(s,1.0 + Math.random()*0.08,s);
         }
 
         if(t.halo){
-            const hs=0.9+Math.random()*0.25;
+            const hs =
+                1.0 +
+                Math.sin(gameTime*7.0 + t.phase) * 0.06 +
+                Math.random() * 0.03;
+
             t.halo.scale.set(hs,hs,hs);
-            t.halo.material.opacity=0.12+Math.random()*0.08;
+            t.halo.material.opacity = 0.10 + Math.random()*0.035 + nightFactor * 0.045;
         }
     }
 }
@@ -855,9 +1047,21 @@ function setBlockFrame(x1,y,z1,x2,z2,type){
     }
 }
 
+function prepareShowcaseChunks(){
+    const chunkRadius = 5;
+
+    for(let cx=-chunkRadius; cx<=chunkRadius; cx++){
+        for(let cz=-chunkRadius; cz<=chunkRadius; cz++){
+            generateChunk(cx, cz);
+        }
+    }
+}
+
 function clearShowcaseArea(){
-    for(let x=-36;x<=40;x++){
-        for(let z=-36;z<=40;z++){
+    prepareShowcaseChunks();
+
+    for(let x=-80;x<=80;x++){
+        for(let z=-80;z<=80;z++){
             for(let y=1;y<WORLD_HEIGHT;y++){
                 setBlock(x,y,z,BLOCK.AIR);
             }
@@ -865,7 +1069,173 @@ function clearShowcaseArea(){
     }
 }
 
+function setBlockIfAir(x,y,z,type){
+    if(getBlock(x,y,z) === BLOCK.AIR){
+        setBlock(x,y,z,type);
+    }
+}
+
+function addShowcaseTree(x, baseY, z, height){
+    height = height || 5;
+
+    for(let y=1; y<=height; y++){
+        setBlock(x, baseY+y, z, BLOCK.WOOD);
+    }
+
+    const top = baseY + height;
+
+    for(let lx=-2; lx<=2; lx++){
+        for(let lz=-2; lz<=2; lz++){
+            const d = Math.abs(lx) + Math.abs(lz);
+            if(d <= 3){
+                setBlockIfAir(x+lx, top-1, z+lz, BLOCK.LEAVES);
+            }
+        }
+    }
+
+    for(let lx=-2; lx<=2; lx++){
+        for(let lz=-2; lz<=2; lz++){
+            const corner = Math.abs(lx) === 2 && Math.abs(lz) === 2;
+            if(!corner){
+                setBlockIfAir(x+lx, top, z+lz, BLOCK.LEAVES);
+            }
+        }
+    }
+
+    for(let lx=-1; lx<=1; lx++){
+        for(let lz=-1; lz<=1; lz++){
+            setBlockIfAir(x+lx, top+1, z+lz, BLOCK.LEAVES);
+        }
+    }
+
+    setBlockIfAir(x, top+2, z, BLOCK.LEAVES);
+    setBlockIfAir(x+1, top+1, z, BLOCK.LEAVES);
+    setBlockIfAir(x-1, top+1, z, BLOCK.LEAVES);
+    setBlockIfAir(x, top+1, z+1, BLOCK.LEAVES);
+    setBlockIfAir(x, top+1, z-1, BLOCK.LEAVES);
+}
+
+
+function buildSimpleShowcasePool(baseY){
+    // Demo aquarium riêng cho Graphics Showcase.
+    // Chỉ dùng vài lớp block cần thiết để tránh đứng máy khi vào mode.
+    // Hồ thiên nhiên trong survival/creative vẫn giữ nguyên logic hiện tại.
+    const minX = 10;
+    const maxX = 30;
+    const minZ = 11;
+    const maxZ = 27;
+    const floorY = baseY;
+    const waterMinY = baseY + 1;
+    const waterMaxY = baseY + 3;
+    const wallMaxY = baseY + 4;
+    window.SHOWCASE_DEMO_POOL_BOUNDS = {
+        minX,
+        maxX,
+        minY: waterMinY,
+        maxY: waterMaxY,
+        minZ,
+        maxZ
+    };
+
+
+    // Nền hồ và viền đá.
+    setBlockBox(9, floorY, 10, 31, floorY, 28, BLOCK.STONE);
+    setBlockBox(minX + 1, floorY, minZ + 1, maxX - 1, floorY, maxZ - 1, BLOCK.SAND);
+
+    // Địa hình đáy nhiều tầng, nhưng rất nhẹ.
+    setBlockBox(12, floorY + 1, 13, 15, floorY + 1, 16, BLOCK.SAND);
+    setBlockBox(25, floorY + 1, 22, 28, floorY + 1, 25, BLOCK.SAND);
+    setBlockBox(18, floorY + 1, 17, 22, floorY + 1, 21, BLOCK.SAND);
+    setBlockBox(20, floorY + 2, 18, 21, floorY + 2, 20, BLOCK.SAND);
+
+    // Cụm đá trang trí dưới nước.
+    setBlockBox(13, floorY + 1, 21, 14, floorY + 1, 22, BLOCK.COBBLESTONE);
+    setBlock(14, floorY + 2, 22, BLOCK.STONE);
+    setBlockBox(26, floorY + 1, 15, 27, floorY + 1, 16, BLOCK.COBBLESTONE);
+    setBlock(26, floorY + 2, 15, BLOCK.STONE);
+
+    // Khúc gỗ chìm nhỏ, không làm cầu ngang che hồ.
+    setBlockBox(23, floorY + 1, 20, 26, floorY + 1, 20, BLOCK.WOOD);
+
+    // Cây thủy sinh đơn giản bằng leaves.
+    const plants = [
+        [13, 14, 2],
+        [16, 24, 2],
+        [19, 23, 3],
+        [24, 15, 2],
+        [27, 24, 3]
+    ];
+
+    for(const p of plants){
+        const px = p[0];
+        const pz = p[1];
+        const h = p[2];
+        for(let i = 0; i < h; i++){
+            setBlock(px, floorY + 1 + i, pz, BLOCK.LEAVES);
+        }
+    }
+
+    // Tường kính cao vừa đủ để nhìn như aquarium nhưng không quá nặng.
+    for(let y = waterMinY; y <= wallMaxY; y++){
+        setBlockBox(minX, y, minZ, maxX, y, minZ, BLOCK.GLASS);
+        setBlockBox(minX, y, maxZ, maxX, y, maxZ, BLOCK.GLASS);
+        setBlockBox(minX, y, minZ + 1, minX, y, maxZ - 1, BLOCK.GLASS);
+        setBlockBox(maxX, y, minZ + 1, maxX, y, maxZ - 1, BLOCK.GLASS);
+    }
+
+    // Fill nước trong lòng hồ, bỏ qua những block trang trí đã đặt.
+    for(let x = minX + 1; x <= maxX - 1; x++){
+        for(let y = waterMinY; y <= waterMaxY; y++){
+            for(let z = minZ + 1; z <= maxZ - 1; z++){
+                if(getBlock(x, y, z) === BLOCK.AIR){
+                    if(typeof setNaturalWaterBlock === 'function'){
+                        setNaturalWaterBlock(x, y, z);
+                    }else{
+                        setBlock(x, y, z, BLOCK.WATER);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+function buildSimpleTransparencyDemo(baseY){
+    // Demo riêng cho Transparency: nhẹ, không dựng cột nước/kính lơ lửng.
+    // Không đụng block cỏ.
+    const x1 = 8, x2 = 20;
+    const z1 = -26, z2 = -14;
+
+    setBlockBox(x1, baseY, z1, x2, baseY, z2, BLOCK.STONE);
+
+    // Glass sample: khung kính thấp, nhìn rõ tính trong suốt.
+    setBlockBox(10, baseY + 1, -24, 14, baseY + 1, -24, BLOCK.GLASS);
+    setBlockBox(10, baseY + 1, -20, 14, baseY + 1, -20, BLOCK.GLASS);
+    setBlockBox(10, baseY + 1, -23, 10, baseY + 1, -21, BLOCK.GLASS);
+    setBlockBox(14, baseY + 1, -23, 14, baseY + 1, -21, BLOCK.GLASS);
+
+    setBlock(10, baseY + 2, -24, BLOCK.GLASS);
+    setBlock(14, baseY + 2, -24, BLOCK.GLASS);
+    setBlock(10, baseY + 2, -20, BLOCK.GLASS);
+    setBlock(14, baseY + 2, -20, BLOCK.GLASS);
+
+    // Water sample: bể nước thấp, nằm trên nền, không còn khối nước bay.
+    setBlockBox(16, baseY + 1, -24, 18, baseY + 1, -22, BLOCK.GLASS);
+    setBlock(17, baseY + 1, -23, BLOCK.WATER);
+    setBlock(17, baseY + 2, -23, BLOCK.WATER);
+
+    // Lá cây làm vật sau kính để thấy kính trong suốt.
+    setBlockBox(11, baseY + 1, -17, 12, baseY + 3, -16, BLOCK.LEAVES);
+
+    // Một cột mẫu nhỏ phía sau nước, giúp nhìn rõ độ trong.
+    setBlock(19, baseY + 1, -18, BLOCK.SAND);
+    setBlock(19, baseY + 2, -18, BLOCK.GLASS);
+}
+
 function setupShowcaseStage(){
+    if(typeof beginWorldBatch === 'function') beginWorldBatch();
+
+    try {
     disposeShowcaseDecor();
 
     showcaseBaseY=32;
@@ -886,9 +1256,6 @@ function setupShowcaseStage(){
     setBlockBox(-4,baseY,24,4,baseY,32,BLOCK.SNOW);
     setBlockFrame(-4,baseY+1,24,4,32,BLOCK.GLASS);
 
-    // ============================================================
-    // Zone 1: Block Gallery
-    // ============================================================
     setBlockFrame(-31,baseY,-27,-5,-8,BLOCK.COBBLESTONE);
 
     const gallery=[
@@ -917,60 +1284,18 @@ function setupShowcaseStage(){
         }
     }
 
-    // ============================================================
-    // Zone 2: Transparency Demo
-    // ============================================================
     setBlockFrame(6,baseY,-27,34,-8,BLOCK.COBBLESTONE);
 
-    setBlockBox(10,baseY,-24,18,baseY,-16,BLOCK.STONE);
-    setBlockBox(10,baseY+1,-24,18,baseY+1,-16,BLOCK.GLASS);
-    setBlockBox(10,baseY+2,-24,18,baseY+4,-24,BLOCK.GLASS);
-    setBlockBox(10,baseY+2,-16,18,baseY+4,-16,BLOCK.GLASS);
-    setBlockBox(10,baseY+2,-23,10,baseY+4,-17,BLOCK.GLASS);
-    setBlockBox(18,baseY+2,-23,18,baseY+4,-17,BLOCK.GLASS);
-    setBlockBox(11,baseY+5,-23,17,baseY+5,-17,BLOCK.GLASS);
+    // Display demo riêng cho transparency: không còn khối nước/kính lơ lửng.
+    buildSimpleTransparencyDemo(baseY);
 
-    setBlockBox(23,baseY+1,-22,25,baseY+5,-20,BLOCK.LEAVES);
-
-    setBlockBox(29,baseY+1,-23,30,baseY+5,-22,BLOCK.WATER);
-    setBlockBox(31,baseY+1,-23,32,baseY+5,-22,BLOCK.GLASS);
-
-    // ============================================================
-    // Zone 3: Water Pool Demo
-    // Glass aquarium-style natural water pool:
-    // - glass wall makes the pool easier to understand visually
-    // - water still uses natural lake/ocean rendering
-    // - player-placed water elsewhere still renders as cube/block
-    // ============================================================
     setBlockFrame(6,baseY,7,34,31,BLOCK.COBBLESTONE);
 
-    // Outer foundation
-    setBlockBox(9,baseY,10,31,baseY,28,BLOCK.STONE);
+    // Lightweight demo aquarium.
+    // Mục tiêu: load nhanh, hợp lý, không ảnh hưởng hồ thiên nhiên.
+    // Không đụng config / texture / UV của block cỏ.
+    buildSimpleShowcasePool(baseY);
 
-    // Sand floor under water
-    setBlockBox(11,baseY,12,29,baseY,26,BLOCK.SAND);
-
-    // Glass wall around pool
-    setBlockBox(10,baseY+1,11,30,baseY+2,11,BLOCK.GLASS);
-    setBlockBox(10,baseY+1,27,30,baseY+2,27,BLOCK.GLASS);
-    setBlockBox(10,baseY+1,12,10,baseY+2,26,BLOCK.GLASS);
-    setBlockBox(30,baseY+1,12,30,baseY+2,26,BLOCK.GLASS);
-
-    // Natural water inside glass wall
-    setNaturalWaterBox(11,baseY+1,12,29,baseY+1,26);
-
-    // Small stair / entry outside the aquarium
-    setBlockBox(7,baseY+1,17,9,baseY+1,22,BLOCK.SAND);
-    setBlockBox(8,baseY+2,19,9,baseY+2,20,BLOCK.SAND);
-
-    // Small bridge over the pool
-    setBlockBox(18,baseY+2,11,22,baseY+2,27,BLOCK.PLANKS);
-    setBlockBox(18,baseY+3,11,18,baseY+3,27,BLOCK.WOOD);
-    setBlockBox(22,baseY+3,11,22,baseY+3,27,BLOCK.WOOD);
-
-    // ============================================================
-    // Zone 4: Raycast / Building Wall
-    // ============================================================
     setBlockFrame(-31,baseY,7,-5,31,BLOCK.COBBLESTONE);
 
     for(let x=-27;x<=-9;x++){
@@ -990,9 +1315,6 @@ function setupShowcaseStage(){
         setBlock(x,baseY+3,26,BLOCK.SAND);
     }
 
-    // ============================================================
-    // Zone 5: Particle Demo
-    // ============================================================
     setBlockFrame(-31,baseY,-5,-5,5,BLOCK.COBBLESTONE);
 
     for(let x=-27;x<=-9;x+=3){
@@ -1001,9 +1323,6 @@ function setupShowcaseStage(){
         setBlock(x,baseY+3,0,BLOCK.BRICK);
     }
 
-    // ============================================================
-    // Zone 6: Entity Demo
-    // ============================================================
     setBlockFrame(6,baseY,-5,34,5,BLOCK.COBBLESTONE);
 
     setBlockBox(10,baseY,-2,30,baseY,2,BLOCK.GRASS);
@@ -1028,9 +1347,10 @@ function setupShowcaseStage(){
         }
     }
 
-    // ============================================================
-    // Zone 7: Point Light / Torch Demo
-    // ============================================================
+    addShowcaseTree(13, baseY, -1, 5);
+    addShowcaseTree(28, baseY, -1, 6);
+    addShowcaseTree(20, baseY, 2, 5);
+
     setupTorchDemo();
 
     setupShowcaseCows();
@@ -1042,44 +1362,48 @@ function setupShowcaseStage(){
 
     applyShadowFlagsToScene();
 
-    dayTime=0.22;
+    dayTime=0.30;
     updateDayNight(0);
+
+    } finally {
+        if(typeof endWorldBatch === 'function') endWorldBatch();
+    }
 }
 
 function setupShowcaseCows(){
     if(typeof cows==='undefined')return;
 
+    // Clear existing land animals before building the showcase Entity Pen.
     for(const c of cows){
         if(c.mesh)scene.remove(c.mesh);
     }
-
     cows.length=0;
 
-    for(let i=0;i<4;i++){
-        spawnCow();
-    }
+    const y = showcaseBaseY + 1;
 
-    const positions=[
-        [15,showcaseBaseY+1,0],
-        [19,showcaseBaseY+1,1],
-        [23,showcaseBaseY+1,-1],
-        [27,showcaseBaseY+1,0]
+    const animals=[
+        {type:'cow',     x:13, y, z:-1.15, yaw:Math.PI*0.50},
+        {type:'pig',     x:16, y, z: 1.05, yaw:Math.PI*1.15},
+        {type:'sheep',   x:19, y, z:-1.10, yaw:Math.PI*0.25},
+        {type:'chicken', x:22, y, z: 1.10, yaw:Math.PI*1.65},
+        {type:'cow',     x:25, y, z:-1.05, yaw:Math.PI*0.85},
+        {type:'pig',     x:28, y, z: 1.05, yaw:Math.PI*1.35},
+        {type:'sheep',   x:15, y, z:-0.05, yaw:Math.PI*0.05},
+        {type:'chicken', x:27, y, z:-0.05, yaw:Math.PI*1.95}
     ];
 
-    for(let i=0;i<cows.length&&i<positions.length;i++){
-        const p=positions[i];
-        cows[i].mesh.position.set(p[0],p[1],p[2]);
-        cows[i].targetY=p[1];
-        cows[i].prevY=p[1];
-        cows[i].aiState='wander';
-        cows[i].aiTimer=2+Math.random()*2;
-
-        if(cows[i].mesh){
-            cows[i].mesh.traverse(obj=>{
-                if(obj.isMesh){
-                    obj.castShadow=true;
-                    obj.receiveShadow=true;
-                }
+    for(const a of animals){
+        if(typeof spawnCow === 'function'){
+            // Dùng lệnh spawn thật của hệ animal, không tự tạo mesh thủ công trong main.
+            spawnCow(a.type, {
+                x:a.x,
+                y:a.y,
+                z:a.z,
+                yaw:a.yaw,
+                force:true,
+                showcaseAnimal:true,
+                aiState:'wander',
+                aiTimer:2+Math.random()*2
             });
         }
     }
@@ -1150,7 +1474,7 @@ function ensureShowcaseHint(){
         <div><b>Water Pool:</b> glass pool + natural water surface</div>
         <div><b>Raycast Wall:</b> chọn, phá, đặt block</div>
         <div><b>Particle Zone:</b> block break / explosion particles</div>
-        <div><b>Entity Pen:</b> cow mesh + animation + shadow</div>
+        <div><b>Entity Pen:</b> land animals + animation + shadow</div>
         <div><b>Point Light:</b> torch light + flicker + local shadows</div>
         <hr style="border:0;border-top:1px solid rgba(255,255,255,0.12);margin:8px 0;">
         <div><kbd>T</kbd> tua ngày/đêm &nbsp; <kbd>P</kbd> particle &nbsp; <kbd>H</kbd> hint/labels</div>
@@ -1191,7 +1515,7 @@ function toggleShowcaseHints(){
 function init(){
     scene=new THREE.Scene();
     scene.background=new THREE.Color(0x87ceeb);
-    scene.fog=new THREE.Fog(0x87ceeb,40,RENDER_DIST*CHUNK_SIZE);
+    scene.fog=new THREE.Fog(0x87ceeb,55,RENDER_DIST*CHUNK_SIZE*1.6);
 
     camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,500);
 
@@ -1210,15 +1534,15 @@ function init(){
     noise2=new SimplexNoise(67890);
     noise3=new SimplexNoise(11111);
 
-    ambientLight=new THREE.AmbientLight(0x606080,0.6);
+    ambientLight=new THREE.AmbientLight(0x606080,0.58);
     scene.add(ambientLight);
 
-    sunLight=new THREE.DirectionalLight(0xfff5e0,0.9);
-    sunLight.position.set(100,200,80);
+    sunLight=new THREE.DirectionalLight(0xfff7df,1.45);
+    sunLight.position.set(0,220,80);
     scene.add(sunLight);
     setupSunShadow();
 
-    scene.add(new THREE.HemisphereLight(0x87ceeb,0x362907,0.4));
+    scene.add(new THREE.HemisphereLight(0x9fdcff,0x4b3824,0.36));
 
     const hlGeom=new THREE.BoxGeometry(1.005,1.005,1.005);
     highlightMesh=new THREE.Mesh(
@@ -1263,6 +1587,8 @@ function setupEvents(){
 
     canvas.addEventListener('click',()=>{
         if(gameStarted&&!isLocked&&!playerDead&&!gamePaused){
+            blurEditableElements();
+
             if(inventoryOpen){
                 toggleInventory();
             }
@@ -1288,6 +1614,9 @@ function setupEvents(){
         }
 
         if(isLocked&&gameStarted&&!playerDead){
+            enableGameInputShield();
+            blurEditableElements();
+
             gamePaused=false;
             document.getElementById('blocker').classList.add('hidden');
             showGameHUD();
@@ -1307,6 +1636,8 @@ function setupEvents(){
     document.addEventListener('mousedown',(e)=>{
         if(!isLocked||gamePaused)return;
 
+        blurEditableElements();
+
         e.preventDefault();
         mouseButtons[e.button]=true;
         pendingClicks[e.button]=true;
@@ -1319,6 +1650,22 @@ function setupEvents(){
     document.addEventListener('contextmenu',(e)=>e.preventDefault());
 
     document.addEventListener('keydown',(e)=>{
+        if(gameStarted && !inventoryOpen && !isEditableElement(e.target)){
+            const gameplayCodes = [
+                'KeyW','KeyA','KeyS','KeyD',
+                'Space','ShiftLeft','ShiftRight',
+                'ControlLeft','ControlRight',
+                'KeyT','KeyG','KeyH','KeyR','KeyP','KeyE',
+                'F3','Escape',
+                'Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9'
+            ];
+
+            if(gameplayCodes.includes(e.code)){
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }
+
         if(e.code==='Escape'&&gameStarted&&gamePaused&&!playerDead&&!inventoryOpen){
             e.preventDefault();
             resumeGame();
@@ -1377,9 +1724,11 @@ function setupEvents(){
     document.addEventListener('wheel',(e)=>{
         if(!isLocked||gamePaused)return;
 
+        e.preventDefault();
+
         selectedSlot=(selectedSlot+(e.deltaY>0?1:8))%9;
         updateHotbarSelection();
-    });
+    },{passive:false});
 
     document.querySelectorAll('.mode-btn').forEach(btn=>{
         btn.addEventListener('click',(e)=>{
@@ -1435,7 +1784,7 @@ function animate(){
         updateBlockInteraction(dt);
 
         if(keys['KeyT']){
-            updateDayNight(dt*25);
+            updateDayNight(dt * DAY_NIGHT_FAST_MULTIPLIER);
         }else{
             dayTimer+=dt;
 
@@ -1452,6 +1801,9 @@ function animate(){
         }
 
         updateCows(dt);
+        if(typeof updateAquaticAnimals === 'function'){
+            updateAquaticAnimals(dt);
+        }
         updateTorchLights(dt);
 
         particleTimer+=dt;
@@ -1478,11 +1830,19 @@ function animate(){
 
         const wOverlay=document.getElementById('waterOverlay');
         if(wOverlay){
-            if(inWater){
+            const cameraUnderwater = isCameraActuallyUnderwater();
+
+            if(cameraUnderwater){
                 wOverlay.classList.add('active');
+                wOverlay.classList.add('deep');
             }else{
                 wOverlay.classList.remove('active');
+                wOverlay.classList.remove('deep');
             }
+        }
+
+        if(typeof updateWaterAnimation === 'function'){
+            updateWaterAnimation(dt, gameTime);
         }
 
         if(showDebug){

@@ -38,9 +38,14 @@ function updatePlayer(dt){
     inWater=(feetBlock===BLOCK.WATER||headBlock===BLOCK.WATER);
     
     // Reset fall tracking when entering water (water breaks falls)
-    if(inWater&&!wasInWater){
+    // Khi đã chạm nước thì rơi xuống đáy hồ không được tính fall damage nữa.
+    if(inWater){
         fallStartY=playerPos.y;
-        playerVel.y=Math.min(playerVel.y,0); // kill downward momentum
+        wasOnGround=false;
+    }
+
+    if(inWater&&!wasInWater){
+        playerVel.y=Math.max(playerVel.y * 0.25, -1.2); // kill downward momentum safely
     }
     
     // === SWIMMING PHYSICS ===
@@ -94,22 +99,35 @@ function updatePlayer(dt){
     
     // === FALL DAMAGE TRACKING ===
     if(onGround&&!wasOnGround){
-        // Just landed
-        const fallDist=fallStartY-playerPos.y;
-        if(fallDist>3){
-            const fallDamage=Math.round((fallDist-3)*5);
-            if(fallDamage>0){
-                damagePlayer(fallDamage,'Rơi từ trên cao');
-                playSound(80,'square',0.2,0.1); // landing thud
-                createExplosionParticles(playerPos.clone(),0x888888,5); // dust
+        // Just landed.
+        // Nếu đang ở trong nước hoặc vừa đáp xuống đáy hồ bên dưới mặt nước,
+        // không tính fall damage. Nước phải triệt tiêu cú rơi như Minecraft.
+        const feetWater = getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y), Math.floor(playerPos.z)) === BLOCK.WATER;
+        const headWater = getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y + 1), Math.floor(playerPos.z)) === BLOCK.WATER;
+        const justLandedInWaterColumn = inWater || feetWater || headWater;
+
+        if(!justLandedInWaterColumn){
+            const fallDist=fallStartY-playerPos.y;
+            if(fallDist>3){
+                const fallDamage=Math.round((fallDist-3)*5);
+                if(fallDamage>0){
+                    damagePlayer(fallDamage,'Rơi từ trên cao');
+                    playSound(80,'square',0.2,0.1); // landing thud
+                    createExplosionParticles(playerPos.clone(),0x888888,5); // dust
+                }
             }
+        }else{
+            fallStartY=playerPos.y;
         }
     }
-    // Track when player starts falling
-    if(onGround){
+
+    // Track when player starts falling.
+    // Khi đang ở trong nước cũng reset liên tục để không tích fall distance dưới đáy hồ.
+    if(onGround || inWater){
         fallStartY=playerPos.y;
     }
-    wasOnGround=onGround;
+
+    wasOnGround=onGround && !inWater;
     
     // === SUB-STEP COLLISION (prevents wall clipping) ===
     const steps=Math.max(1,Math.ceil((Math.abs(playerVel.x)+Math.abs(playerVel.y)+Math.abs(playerVel.z))*dt/0.35));
@@ -169,7 +187,7 @@ function collidesSolid(pos,w,h){
 }
 
 function damagePlayer(amount, cause) {
-    if ((typeof godMode !== 'undefined' && godMode) || invulnTimer > 0 || playerDead) return;
+    if (invulnTimer > 0 || playerDead) return;
     playerHealth -= amount;
     invulnTimer = 0.5;
     deathCause = cause || 'Zombie đã tiêu diệt bạn';
@@ -224,58 +242,102 @@ function attackNearestEntity() {
     ).normalize();
 
     let closestDist = playerAttackRange;
-    let closestTarget = null; // { type: 'cow'|'zombie', index: number }
+    let closestTarget = null; // { type: 'cow'|'zombie'|'aquatic', index: number }
 
     // Check cows
-    for (let i = 0; i < cows.length; i++) {
-        const cow = cows[i];
-        const toCow = cow.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)).sub(camera.position);
-        const dist = toCow.length();
-        if (dist > playerAttackRange) continue;
-        toCow.normalize();
-        const dot = dir.dot(toCow);
-        if (dot > 0.7 && dist < closestDist) {
-            closestDist = dist;
-            closestTarget = { type: 'cow', index: i };
+    if (typeof cows !== 'undefined') {
+        for (let i = 0; i < cows.length; i++) {
+            const cow = cows[i];
+            const toCow = cow.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)).sub(camera.position);
+            const dist = toCow.length();
+            if (dist > playerAttackRange) continue;
+
+            toCow.normalize();
+            const dot = dir.dot(toCow);
+
+            if (dot > 0.7 && dist < closestDist) {
+                closestDist = dist;
+                closestTarget = { type: 'cow', index: i };
+            }
         }
     }
 
     // Check zombies
-    for (let i = 0; i < zombies.length; i++) {
-        const z = zombies[i];
-        const toZ = z.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)).sub(camera.position);
-        const dist = toZ.length();
-        if (dist > playerAttackRange) continue;
-        toZ.normalize();
-        const dot = dir.dot(toZ);
-        if (dot > 0.7 && dist < closestDist) {
-            closestDist = dist;
-            closestTarget = { type: 'zombie', index: i };
+    if (typeof zombies !== 'undefined') {
+        for (let i = 0; i < zombies.length; i++) {
+            const z = zombies[i];
+            const toZ = z.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)).sub(camera.position);
+            const dist = toZ.length();
+            if (dist > playerAttackRange) continue;
+
+            toZ.normalize();
+            const dot = dir.dot(toZ);
+
+            if (dot > 0.7 && dist < closestDist) {
+                closestDist = dist;
+                closestTarget = { type: 'zombie', index: i };
+            }
+        }
+    }
+
+    // Check aquatic animals.
+    // Quan trọng: dưới nước raycast thường không bắt được block/entity như trên cạn,
+    // nên phải check trực tiếp hướng nhìn camera -> aquatic mesh.
+    if (typeof aquaticAnimals !== 'undefined') {
+        for (let i = 0; i < aquaticAnimals.length; i++) {
+            const a = aquaticAnimals[i];
+            if (!a || !a.mesh) continue;
+
+            const hitOffsetY = a.type === 'squid' ? 0.35 : 0.15;
+            const toAquatic = a.mesh.position.clone().add(new THREE.Vector3(0, hitOffsetY, 0)).sub(camera.position);
+            const dist = toAquatic.length();
+
+            // Cho dưới nước dễ chém hơn một chút.
+            const aquaticRange = playerAttackRange + 0.9;
+            if (dist > aquaticRange) continue;
+
+            toAquatic.normalize();
+            const dot = dir.dot(toAquatic);
+
+            // Cá/rùa/mực nhỏ và di chuyển liên tục, threshold rộng hơn cow/zombie.
+            if (dot > 0.55 && dist < closestDist + 0.9) {
+                closestDist = dist;
+                closestTarget = { type: 'aquatic', index: i };
+            }
         }
     }
 
     if (closestTarget) {
-        const kbDir = closestTarget.type === 'cow'
-            ? cows[closestTarget.index].mesh.position.clone().sub(camera.position).normalize()
-            : zombies[closestTarget.index].mesh.position.clone().sub(camera.position).normalize();
-
         if (closestTarget.type === 'cow') {
             const cow = cows[closestTarget.index];
+            const kbDir = cow.mesh.position.clone().sub(camera.position).normalize();
+
             cow.health -= playerDamage;
             cow.hurtTimer = 0.35;
             cow.aiState = 'flee';
             cow.aiTimer = 3;
-            // Moo pain sound
+
             playSound(200 + Math.random() * 60, 'sawtooth', 0.2, 0.1);
             playSound(300, 'square', 0.05, 0.05);
+
             cow.knockbackVel.set(kbDir.x * 12, 3, kbDir.z * 12);
-        } else {
+        } else if (closestTarget.type === 'zombie') {
             const z = zombies[closestTarget.index];
+            const kbDir = z.mesh.position.clone().sub(camera.position).normalize();
+
             z.health -= playerDamage;
             z.hurtTimer = 0.35;
+
             playSound(180 + Math.random() * 80, 'sawtooth', 0.15, 0.1);
             playSound(400, 'square', 0.05, 0.06);
+
             z.knockbackVel.set(kbDir.x * 18, 4, kbDir.z * 18);
+        } else if (closestTarget.type === 'aquatic') {
+            const a = aquaticAnimals[closestTarget.index];
+
+            if (typeof damageAquaticAnimal === 'function') {
+                damageAquaticAnimal(a, playerDamage, camera.position);
+            }
         }
     }
 

@@ -31,7 +31,7 @@
         </div>
 
         <div class="controls-box">
-            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — Di chuyển &nbsp; <kbd>Space</kbd> — Nhảy / Bơi &nbsp; <kbd>Shift</kbd> — Chạy nhanh</div>
+            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — Di chuyển &nbsp; <kbd>Space</kbd> — Nhảy / Bơi / Bay lên &nbsp; <kbd>Shift</kbd> — Chạy nhanh / Bay xuống</div>
             <div><kbd>Click trái</kbd> — Phá khối / Đánh quái &nbsp; <kbd>Click phải</kbd> — Đặt khối / Ăn</div>
             <div><kbd>1</kbd>–<kbd>9</kbd> hoặc <kbd>Scroll</kbd> — Chọn vật phẩm &nbsp; <kbd>F3</kbd> — Debug &nbsp; <kbd>E</kbd> — Inventory</div>
             <div><kbd>T</kbd> — Tua ngày/đêm &nbsp; <kbd>G</kbd> — God mode demo</div>
@@ -74,8 +74,15 @@
     <div class="death-title">Bạn đã chết!</div>
     <div class="death-sub" id="deathCause">Zombie đã tiêu diệt bạn</div>
     <div class="death-stats">
-        <div class="death-stat"><div class="death-stat-val" id="deathKills">0</div><div class="death-stat-label">Zombie hạ</div></div>
-        <div class="death-stat"><div class="death-stat-val" id="deathWave">1</div><div class="death-stat-label">Đợt sóng</div></div>
+        <div class="death-stat">
+            <div class="death-stat-val" id="deathKills">0</div>
+            <div class="death-stat-label">Zombie hạ</div>
+        </div>
+
+        <div class="death-stat">
+            <div class="death-stat-val" id="deathWave">1</div>
+            <div class="death-stat-label">Đợt sóng</div>
+        </div>
     </div>
     <button class="start-btn" id="respawnBtn">Hồi sinh</button>
 </div>
@@ -100,6 +107,7 @@
 <script src="js/entities.js"></script>
 <script src="js/player.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/aquatic.js"></script>
 <script src="js/main.js"></script>
 
 </body>

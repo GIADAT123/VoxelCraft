@@ -18,10 +18,102 @@ const BLOCK_DATA = {
     [BLOCK.BRICK]:{name:'Gạch',color:[0.65,0.30,0.25],solid:true},
 };
 // Food item types
-const ITEM = { BEEF: -2 };
-const ITEM_DATA = {
-    [ITEM.BEEF]: { name: 'Thịt bò', color: [0.70, 0.15, 0.15], healAmount: 30 },
+const ITEM = {
+    BEEF: -2,
+    PORK: -3,
+    CHICKEN: -4,
+    MUTTON: -5,
+    FISH: -6,
+    TURTLE_MEAT: -7,
+    SQUID_MEAT: -8,
 };
+
+const ITEM_DATA = {
+    [ITEM.BEEF]: {
+        name: 'Thịt bò',
+        pickupName: 'thịt bò',
+        emoji: '🥩',
+        color: [0.70, 0.15, 0.15],
+        healAmount: 30
+    },
+    [ITEM.PORK]: {
+        name: 'Thịt heo',
+        pickupName: 'thịt heo',
+        emoji: '🥓',
+        color: [0.95, 0.38, 0.42],
+        healAmount: 28
+    },
+    [ITEM.CHICKEN]: {
+        name: 'Thịt gà',
+        pickupName: 'thịt gà',
+        emoji: '🍗',
+        color: [0.95, 0.78, 0.52],
+        healAmount: 24
+    },
+    [ITEM.MUTTON]: {
+        name: 'Thịt cừu',
+        pickupName: 'thịt cừu',
+        emoji: '🥩',
+        color: [0.78, 0.22, 0.22],
+        healAmount: 28
+    },
+    [ITEM.FISH]: {
+        name: 'Thịt cá',
+        pickupName: 'thịt cá',
+        emoji: '🐟',
+        color: [0.25, 0.62, 0.95],
+        healAmount: 20
+    },
+    [ITEM.TURTLE_MEAT]: {
+        name: 'Thịt rùa',
+        pickupName: 'thịt rùa',
+        emoji: '🐢',
+        color: [0.25, 0.58, 0.35],
+        healAmount: 22
+    },
+    [ITEM.SQUID_MEAT]: {
+        name: 'Thịt mực',
+        pickupName: 'thịt mực',
+        emoji: '🦑',
+        color: [0.45, 0.30, 0.85],
+        healAmount: 20
+    },
+};
+
+const ANIMAL_MEAT_ITEM = {
+    cow: ITEM.BEEF,
+    bò: ITEM.BEEF,
+
+    pig: ITEM.PORK,
+    heo: ITEM.PORK,
+
+    chicken: ITEM.CHICKEN,
+    gà: ITEM.CHICKEN,
+
+    sheep: ITEM.MUTTON,
+    cừu: ITEM.MUTTON,
+
+    fish: ITEM.FISH,
+    fish_blue: ITEM.FISH,
+    fish_orange: ITEM.FISH,
+    fish_yellow: ITEM.FISH,
+    cá: ITEM.FISH,
+
+    turtle: ITEM.TURTLE_MEAT,
+    rùa: ITEM.TURTLE_MEAT,
+
+    squid: ITEM.SQUID_MEAT,
+    mực: ITEM.SQUID_MEAT,
+};
+
+function normalizeAnimalType(animalType) {
+    return String(animalType || '').trim().toLowerCase();
+}
+
+function getMeatItemForAnimal(animalType) {
+    return ANIMAL_MEAT_ITEM[normalizeAnimalType(animalType)] || ITEM.BEEF;
+}
+
 function isFoodItem(type) { return ITEM_DATA[type] !== undefined; }
 function getItemData(type) { return BLOCK_DATA[type] || ITEM_DATA[type]; }
 
