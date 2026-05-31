@@ -83,6 +83,7 @@ function createZombieMesh(type) {
 }
 
 function spawnZombie(type) {
+    if(typeof gameMode !== 'undefined' && gameMode !== 'survival') return;
     if (zombies.length >= 15) return; // Max zombies reduced for performance
 
     const zt = ZOMBIE_TYPES[type] || ZOMBIE_TYPES.normal;
@@ -224,6 +225,11 @@ function turnLandAnimalAwayFromWater(animal) {
 }
 
 function updateZombies(dt) {
+    if(typeof gameMode !== 'undefined' && gameMode !== 'survival'){
+        if(typeof clearZombies === 'function') clearZombies();
+        return;
+    }
+
     // Spawn logic - spawn at night
     const sunAngle = dayTime * Math.PI * 2;
     const sunY = Math.sin(sunAngle);

@@ -448,7 +448,13 @@ function updateBlockInteraction(dt){
         if(pendingClicks[0]){
             pendingClicks[0]=false;
 
-            attackNearestEntity();
+            if(gameMode === 'survival'){
+
+
+                attackNearestEntity();
+
+
+            }
 
             const bd=BLOCK_DATA[hit.block];
             if(bd&&bd.solid&&!bd.unbreakable){
@@ -476,7 +482,11 @@ function updateBlockInteraction(dt){
 
         if(pendingClicks[0]){
             pendingClicks[0]=false;
-            attackNearestEntity();
+            if(gameMode === 'survival'){
+
+                attackNearestEntity();
+
+            }
         }
     }
 }
@@ -599,7 +609,11 @@ function applyGameMode(mode){
     selectedSlot=0;
     playerVel.set(0,0,0);
 
-    if(gameMode!=='survival')clearZombies();
+    if(gameMode!=='survival'){
+        clearZombies();
+        if(typeof waveActive !== 'undefined') waveActive = false;
+        if(typeof zombieSpawnTimer !== 'undefined') zombieSpawnTimer = 0;
+    }
 
     if(gameMode==='survival'){
         hotbarItems=[

@@ -10,33 +10,53 @@
 
 <div id="blocker">
     <div class="menu-panel">
+        <div class="menu-topline">VoxelCraft  •  Survival / Creative / Showcase</div>
         <div class="game-title">VoxelCraft</div>
         <div class="game-subtitle">Sandbox Voxel World</div>
 
+        <div class="menu-feature-strip">
+            <span>🧱 Voxel Building</span>
+            <span>🌊 Aquarium & Water Life</span>
+            <span>🐄 Land Animals</span>
+            <span>✈ Creative Flight</span>
+        </div>
+
         <div class="mode-buttons">
-            <button class="start-btn mode-btn" data-mode="survival">
+            <button class="start-btn mode-btn mode-survival" data-mode="survival">
                 <span class="mode-title">Survival Mode</span>
-                <span class="mode-small">Xây dựng ban ngày, sinh tồn ban đêm</span>
+                <span class="mode-small">Sinh tồn, chiến đấu, động vật, zombie ban đêm</span>
             </button>
 
-            <button class="start-btn mode-btn" data-mode="creative">
+            <button class="start-btn mode-btn mode-creative" data-mode="creative">
                 <span class="mode-title">Creative Mode</span>
-                <span class="mode-small">Block vô hạn, tự do xây dựng</span>
+                <span class="mode-small">Block vô hạn, không sát thương, Space bay lên, Shift hạ xuống</span>
             </button>
 
-            <button class="start-btn mode-btn" data-mode="showcase">
+            <button class="start-btn mode-btn mode-showcase" data-mode="showcase">
                 <span class="mode-title">Graphics Showcase</span>
-                <span class="mode-small">Map demo lighting, texture, water, raycast</span>
+                <span class="mode-small">Lighting, kính, nước, aquarium, entity pen, raycast</span>
             </button>
         </div>
 
-        <div class="controls-box">
-            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — Di chuyển &nbsp; <kbd>Space</kbd> — Nhảy / Bơi / Bay lên &nbsp; <kbd>Shift</kbd> — Chạy nhanh / Bay xuống</div>
-            <div><kbd>Click trái</kbd> — Phá khối / Đánh quái &nbsp; <kbd>Click phải</kbd> — Đặt khối / Ăn</div>
-            <div><kbd>1</kbd>–<kbd>9</kbd> hoặc <kbd>Scroll</kbd> — Chọn vật phẩm &nbsp; <kbd>F3</kbd> — Debug &nbsp; <kbd>E</kbd> — Inventory</div>
-            <div><kbd>T</kbd> — Tua ngày/đêm &nbsp; <kbd>G</kbd> — God mode demo</div>
-            <div style="color:rgba(255,200,100,0.5);margin-top:4px;">🐄 Giết bò → Nhặt thịt → Click phải để ăn hồi máu</div>
-            <div style="color:rgba(255,100,100,0.5);margin-top:4px;">⚠ Zombie xuất hiện khi trời tối — Hãy chuẩn bị!</div>
+        <div class="controls-box controls-modern">
+            <div class="control-grid">
+                <div class="control-row"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Di chuyển</span></div>
+                <div class="control-row"><span><kbd>Space</kbd></span><span>Nhảy / Bơi / Bay lên</span></div>
+                <div class="control-row"><span><kbd>Shift</kbd></span><span>Chạy nhanh / Bay xuống</span></div>
+                <div class="control-row"><span><kbd>Click trái</kbd></span><span>Phá khối / Đánh quái</span></div>
+                <div class="control-row"><span><kbd>Click phải</kbd></span><span>Đặt khối</span></div>
+                <div class="control-row"><span><kbd>1</kbd>–<kbd>9</kbd> / <kbd>Scroll</kbd></span><span>Chọn vật phẩm</span></div>
+                <div class="control-row"><span><kbd>E</kbd></span><span>Inventory</span></div>
+                <div class="control-row"><span><kbd>F3</kbd></span><span>Debug</span></div>
+                <div class="control-row"><span><kbd>T</kbd></span><span>Tua ngày/đêm</span></div>
+                <div class="control-row"><span><kbd>G</kbd></span><span>God mode demo</span></div>
+            </div>
+
+            <div class="menu-notes">
+                <div>🐄 Survival có động vật trên cạn và sinh vật dưới nước</div>
+                <div>🌊 Graphics Showcase có aquarium, kính, nước và entity pen</div>
+                <div>⚠ Zombie xuất hiện khi trời tối trong Survival</div>
+            </div>
         </div>
     </div>
 </div>

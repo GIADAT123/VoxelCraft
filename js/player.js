@@ -37,7 +37,69 @@ function updatePlayer(dt){
     const wasInWater=inWater;
     inWater=(feetBlock===BLOCK.WATER||headBlock===BLOCK.WATER);
     
-    // Reset fall tracking when entering water (water breaks falls)
+    
+    // === CREATIVE FLIGHT ===
+    // Creative mode is a true free-fly mode:
+    // - no gravity
+    // - no damage / fall damage
+    // - hold Space to fly up
+    // - hold Shift to descend gently
+    if(typeof gameMode !== 'undefined' && gameMode === 'creative'){
+        const creativeSpeed = (keys['ControlLeft'] || keys['ControlRight']) ? 14 : 9;
+        const creativeVerticalSpeed = 5.2;
+
+        const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+        const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+        let moveDir = new THREE.Vector3(0, 0, 0);
+
+        if(keys['KeyW']) moveDir.add(forward);
+        if(keys['KeyS']) moveDir.sub(forward);
+        if(keys['KeyA']) moveDir.sub(right);
+        if(keys['KeyD']) moveDir.add(right);
+
+        if(moveDir.lengthSq() > 0) moveDir.normalize();
+
+        playerVel.x = moveDir.x * creativeSpeed;
+        playerVel.z = moveDir.z * creativeSpeed;
+        playerVel.y = 0;
+
+        if(keys['Space']){
+            playerVel.y = creativeVerticalSpeed;
+        }else if(keys['ShiftLeft'] || keys['ShiftRight']){
+            playerVel.y = -creativeVerticalSpeed * 0.72;
+        }
+
+        playerPos.x += playerVel.x * dt;
+        playerPos.y += playerVel.y * dt;
+        playerPos.z += playerVel.z * dt;
+
+        if(playerPos.y < 2){
+            playerPos.y = 2;
+            playerVel.y = 0;
+        }
+
+        onGround = false;
+        wasOnGround = false;
+        fallStartY = playerPos.y;
+
+        camera.position.copy(playerPos);
+        camera.position.y += ph - 0.2;
+
+        const lookDir = new THREE.Vector3(
+            -Math.sin(yaw) * Math.cos(pitch),
+            Math.sin(pitch),
+            -Math.cos(yaw) * Math.cos(pitch)
+        );
+
+        camera.lookAt(camera.position.clone().add(lookDir));
+
+        if(invulnTimer > 0) invulnTimer -= dt;
+        if(playerAttackCooldown > 0) playerAttackCooldown -= dt;
+
+        return;
+    }
+
+// Reset fall tracking when entering water (water breaks falls)
     // Khi đã chạm nước thì rơi xuống đáy hồ không được tính fall damage nữa.
     if(inWater){
         fallStartY=playerPos.y;
@@ -187,7 +249,14 @@ function collidesSolid(pos,w,h){
 }
 
 function damagePlayer(amount, cause) {
-    if (invulnTimer > 0 || playerDead) return;
+    if (playerDead) return;
+
+    // Creative/showcase/god mode must not take damage.
+    if ((typeof gameMode !== 'undefined' && gameMode !== 'survival') || (typeof godMode !== 'undefined' && godMode)) {
+        return;
+    }
+
+    if (invulnTimer > 0) return;
     playerHealth -= amount;
     invulnTimer = 0.5;
     deathCause = cause || 'Zombie đã tiêu diệt bạn';

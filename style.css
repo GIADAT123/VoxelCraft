@@ -646,3 +646,195 @@ canvas { display: block; }
     text-transform: uppercase;
     letter-spacing: 1px;
 }
+
+/* ================================================================
+   MENU REFRESH 2026 — no chatbox / no command UI version
+   ================================================================ */
+#blocker {
+    background:
+        radial-gradient(circle at 50% 35%, rgba(110, 200, 90, 0.10) 0%, rgba(0,0,0,0.08) 28%, rgba(0,0,0,0.58) 100%),
+        linear-gradient(180deg, rgba(10,25,35,0.42), rgba(0,0,0,0.52));
+    backdrop-filter: blur(2.5px) saturate(1.12);
+    -webkit-backdrop-filter: blur(2.5px) saturate(1.12);
+}
+
+.menu-panel {
+    width: min(860px, calc(100vw - 48px));
+    max-height: calc(100vh - 52px);
+    overflow: hidden;
+    padding: 30px 40px 26px;
+    border-radius: 20px;
+    background:
+        linear-gradient(180deg, rgba(17, 35, 39, 0.58), rgba(7, 12, 14, 0.46)),
+        rgba(0,0,0,0.18);
+    border: 1px solid rgba(180,255,170,0.12);
+    box-shadow:
+        0 28px 90px rgba(0,0,0,0.36),
+        inset 0 1px 0 rgba(255,255,255,0.08),
+        0 0 0 1px rgba(0,0,0,0.18);
+}
+
+.menu-topline {
+    display: inline-block;
+    margin-bottom: 8px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: rgba(120, 255, 110, 0.08);
+    border: 1px solid rgba(140, 255, 120, 0.16);
+    color: rgba(220,255,210,0.60);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+.game-title {
+    font-size: clamp(50px, 6vw, 78px);
+    margin-bottom: 4px;
+    letter-spacing: -2px;
+    filter: drop-shadow(0 10px 22px rgba(0,0,0,0.35));
+}
+
+.game-subtitle {
+    margin-bottom: 18px;
+    color: rgba(255,255,255,0.54);
+    letter-spacing: 7px;
+}
+
+.menu-feature-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 auto 20px;
+}
+
+.menu-feature-strip span {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.065);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: rgba(255,255,255,0.68);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.mode-buttons {
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.mode-btn {
+    width: min(430px, 100%);
+    min-height: 72px;
+    padding: 13px 24px;
+    border-radius: 9px;
+    position: relative;
+    overflow: hidden;
+}
+
+.mode-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(90deg, rgba(255,255,255,0.16), transparent 26%, transparent 74%, rgba(0,0,0,0.12)),
+        radial-gradient(circle at 18% 18%, rgba(255,255,255,0.16), transparent 32%);
+    pointer-events: none;
+}
+
+.mode-btn:hover {
+    transform: translateY(-2px) scale(1.025);
+}
+
+.mode-survival {
+    background: linear-gradient(135deg, rgba(78,175,45,0.98), rgba(38,125,35,0.98));
+}
+
+.mode-creative {
+    background: linear-gradient(135deg, rgba(70,175,72,0.98), rgba(40,135,76,0.98));
+}
+
+.mode-showcase {
+    background: linear-gradient(135deg, rgba(74,170,55,0.98), rgba(38,115,42,0.98));
+}
+
+.mode-title {
+    font-size: 18px;
+    letter-spacing: 2.5px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.24);
+}
+
+.mode-small {
+    max-width: 340px;
+    line-height: 1.35;
+    color: rgba(255,255,255,0.72);
+}
+
+.controls-modern {
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.09);
+    color: rgba(255,255,255,0.48);
+    line-height: 1.55;
+}
+
+.control-grid {
+    width: min(680px, 100%);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px 14px;
+}
+
+.control-row {
+    display: grid;
+    grid-template-columns: 145px 1fr;
+    align-items: center;
+    text-align: left;
+    gap: 8px;
+    min-height: 28px;
+    font-size: 12px;
+}
+
+.control-row > span:first-child {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.controls-box kbd {
+    padding: 3px 7px;
+    background: rgba(255,255,255,0.10);
+    border-color: rgba(255,255,255,0.20);
+    color: rgba(255,255,255,0.72);
+}
+
+.menu-notes {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: rgba(255, 215, 135, 0.62);
+    font-size: 12px;
+}
+
+.menu-notes div:last-child {
+    color: rgba(255, 120, 120, 0.62);
+}
+
+@media (max-width: 760px) {
+    .menu-panel {
+        padding: 22px 18px;
+    }
+
+    .control-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .control-row {
+        grid-template-columns: 132px 1fr;
+    }
+
+    .menu-feature-strip span {
+        font-size: 10px;
+    }
+}
